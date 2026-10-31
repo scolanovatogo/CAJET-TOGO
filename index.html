@@ -68,7 +68,7 @@ async function traiter(){if(!FB||!S||S.role=='agent')return;const q=await(await 
   if(c&&c.type=='Tontine'&&+x.m>0&&+x.m>=c.mise){const t={id:nid(D.tx),num:c.num,idc:c.id,d:x.d,h:x.h,type:'Dépôt',m:+x.m,nom:c.nom,caissier:'Agent '+x.ag,idCaisse:0,qid:k};D.tx.push(t);cycle(c,t.m,x.d,t.id);const l=D.ton[D.ton.length-1];l.caissier='Agent '+x.ag;l.idCaisse=0;n++}else bad[k]=1}
  if(n)save();await PQ;
  for(const k of Object.keys(q))if(bad[k]||D.tx.some(t=>t.qid==k))await fj('queue/'+k,{method:'DELETE'})}
-setInterval(async()=>{if(!FB||!S||S.role=='agent'||$('#m').className||document.hidden)return;try{await PQ;await pull();await traiter();if(CUR=='home'||LS[CUR])go(CUR)}catch(e){}},20000);
+setInterval(async()=>{if(!FB||!S||S.role=='agent'||$('#m').className||document.hidden)return;try{try{await licence()}catch(e){alert(e.message);loginView();return}await PQ;await pull();await traiter();if(CUR=='home'||LS[CUR])go(CUR)}catch(e){}},20000);
 /* ===== LOGIQUE MÉTIER (portage du VBA) ===== */
 function rib(type){const r={Tontine:[0,3],Courant:[4,6],Epargne:[7,9]}[type]||E('Type de compte invalide');
  const used=new Set(D.comptes.map(c=>num(c.num).substr(7,8)));
@@ -112,8 +112,10 @@ function ouvrir(f){if(!A())E('Seul l’administrateur peut ouvrir une caisse');i
 function cloturer(reel){if(!A())E('Seul l’administrateur peut clôturer la caisse');const k=D.caisses.find(x=>x.id==D.p.caisse)||E('Aucune caisse ouverte');if(reel===''||isNaN(reel))E('Saisir le solde réel');
  D.clot.push({id:k.id,caissier:k.caissier,d:T(),theo:k.solde,reel:+reel,ecart:+reel-k.solde});k.statut='FERMEE';D.p.caissier='';D.p.caisse=0;save()}
 async function addCaissier(f){if(!A())E("Réservé à l'administrateur");if(!f.nom||!f.pre||!f.mdp)E('Nom, Prénom et Mot de passe obligatoires');if(FB&&f.mdp.trim().length<MINP)E('Mot de passe : '+MINP+' caractères minimum');const idn=f.nom.trim().toLowerCase();if(idn==D.auth.user||D.cais.some(x=>x.nom.trim().toLowerCase()==idn)||D.ag.some(x=>x.nom.trim().toLowerCase()==idn))E('Cet identifiant (nom) existe déjà');const{mdp,...r}=f;r.nom=f.nom.trim();D.cais.push({id:nid(D.cais),...r,h:await H(mdp)});if(FB&&r.st!='Inactif')await putWrap('ku',r.nom,mdp,KD);save()}
+async function licence(){if(!FB)return;let L;try{L=await(await fj('licence')).json()}catch(e){return}
+ if(L&&(L.actif===false||(L.jusqu&&new Date().toISOString().slice(0,10)>L.jusqu)))E(L.msg||"Licence désactivée ou expirée : contactez l'administrateur du logiciel.")}
 async function login(u,p){u=u.trim().toLowerCase();
- if(FB){const id=await uid(u);let w=await(await fj('ka/'+id)).json();
+ if(FB){await licence();const id=await uid(u);let w=await(await fj('ka/'+id)).json();
   if(w){KA=await unwrap(p,w);AV=JSON.parse(await dec(KA,await(await fj('agentview')).json()));S={role:'agent',nom:AV.ag[id]||u};return}
   w=await(await fj('ku/'+id)).json()||E('Identifiant inconnu');KD=await unwrap(p,w);await pull();await setKA();
   if(D.auth.user&&u==D.auth.user)S={role:'admin',nom:'Administrateur'};else{const c=D.cais.find(x=>x.nom.trim().toLowerCase()==u)||E('Identifiant inconnu');if(c.st=='Inactif')E('Ce caissier est inactif');S={role:'caissier',nom:c.nom}}
@@ -191,7 +193,7 @@ function agentView(){shell();const L=(AV.comptes||[]).slice().sort((a,b)=>a.nom.
  const fill=()=>{const q=$('#sr').value.toLowerCase();$('#sl').innerHTML=L.filter(c=>c.nom.toLowerCase().includes(q)).map(c=>`<option value="${c.num}">${c.nom} — ${c.num}</option>`).join('');info()},info=()=>{const c=L.find(x=>x.num==$('#sl').value);$('#an').textContent=c?`N° de compte : ${c.num} · Cotisation minimale : ${fm(c.mise)} FCFA`:'Aucun compte tontine trouvé'};
  $('#sr').oninput=fill;$('#sl').onchange=info;fill();
  $('#af').onsubmit=async e=>{e.preventDefault();const f=Object.fromEntries(new FormData(e.target)),c=L.find(x=>x.num==f.num);try{if(!c)E('Choisissez un client');if(!(+f.m>0))E('Montant invalide');if(+f.m<c.mise)E('Montant insuffisant : minimum '+fm(c.mise)+' FCFA');
-  const r=await fj('queue',{method:'POST',body:JSON.stringify(await enc(KA,JSON.stringify({ag:S.nom,num:c.num,m:+f.m,d:T(),h:new Date().toLocaleTimeString('fr-FR')})))});if(!r.ok)throw 0;
+  await licence();const r=await fj('queue',{method:'POST',body:JSON.stringify(await enc(KA,JSON.stringify({ag:S.nom,num:c.num,m:+f.m,d:T(),h:new Date().toLocaleTimeString('fr-FR')})))});if(!r.ok)throw 0;
   mine.unshift(`✔ ${c.nom} (${c.num}) — ${fm(+f.m)} FCFA — ${new Date().toLocaleTimeString('fr-FR')}`);$('#mine').innerHTML=mine.join('<br>');e.target.m.value='';$('#er').textContent=''}catch(x){$('#er').textContent=x.message||'Dépôt NON envoyé : vérifiez la connexion Internet'}}}
 async function loginView(){S=null;KD=null;KA=null;shell();let first=!D.auth.user||!D.auth.admin;
  if(FB){try{const ri=await fj('init');if(!ri.ok)throw 0;first=!(await ri.json())}catch(e){V('<div class=card><p class=er>Connexion Internet requise.</p><button onclick=loginView()>Réessayer</button></div>');return}}
