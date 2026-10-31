@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="fr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>CAJET</title>
+<style>
+:root{--b:#0b5cab;--r:#d32f2f;--bg:#f4f6fa;--c:#fff;--t:#1a1d24;--m:#667;--l:#dde2ea}
+@media(prefers-color-scheme:dark){:root{--bg:#14171c;--c:#1e232b;--t:#e8ebf0;--m:#99a;--l:#323a46}}
+*{box-sizing:border-box}body{margin:0;font:15px system-ui,sans-serif;background:var(--bg);color:var(--t);padding-bottom:70px}
+header{background:var(--b);color:#fff;padding:10px 14px;padding-top:max(10px,env(safe-area-inset-top));display:flex;justify-content:space-between;align-items:center}
+header b{font-size:18px;letter-spacing:2px}header small{display:block;opacity:.85;font-size:11px}
+main{padding:12px;max-width:900px;margin:auto}
+nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--c);border-top:1px solid var(--l);padding-bottom:env(safe-area-inset-bottom)}
+nav button{flex:1;background:none;border:0;color:var(--m);padding:12px 2px;font-size:12px}
+.card{background:var(--c);border:1px solid var(--l);border-radius:12px;padding:12px;margin-bottom:10px}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.st{text-align:center}.st b{display:block;font-size:22px;color:var(--b)}
+button,.btn{background:var(--b);color:#fff;border:0;border-radius:10px;padding:11px 14px;font-size:15px}
+button.g{background:var(--l);color:var(--t)}button.r{background:var(--r)}
+.grid button{padding:16px 8px}
+input,select{width:100%;padding:10px;margin:3px 0 10px;border:1px solid var(--l);border-radius:8px;background:var(--bg);color:var(--t);font-size:16px}
+label{font-size:13px;color:var(--m);display:block}
+.er{color:var(--r);min-height:18px;margin:0 0 8px}
+#m{display:none;position:fixed;inset:0;background:#0007;z-index:9;align-items:flex-end}
+#m.on{display:flex}.sheet{background:var(--c);width:100%;max-height:92vh;overflow:auto;padding:16px;border-radius:16px 16px 0 0;padding-bottom:max(16px,env(safe-area-inset-bottom))}
+.tw{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:13px}th,td{padding:6px 8px;border-bottom:1px solid var(--l);text-align:left;white-space:nowrap}th{background:var(--bg)}
+.rc{border:1px dashed var(--m);padding:12px;margin-bottom:14px;background:var(--c)}
+.chip{background:#fff3;border-radius:12px;padding:2px 10px;font-size:12px}
+@media print{header,nav,.np,#m{display:none!important}body{background:#fff;color:#000;padding:0}}
+</style></head><body>
+<header><div><b>CAJET</b><small>Centre d'Appui aux Jeunes Entrepreneurs du Togo</small></div><span class="chip" id="who"></span></header>
+<main id="v"></main><nav id="nv"></nav><div id="m"></div>
+<script>
+const $=s=>document.querySelector(s),K='cajet_db_v1',E=m=>{throw new Error(m)},num=s=>String(s||'').replace(/\s/g,'');
+const fm=n=>Math.round(n).toLocaleString('fr-FR').replace(/[\u202f\u00a0]/g,' '),fd=d=>d?String(d).split('-').reverse().join('/'):'';
+const T=()=>{const d=new Date();return new Date(d-d.getTimezoneOffset()*6e4).toISOString().slice(0,10)};
+const addD=(d,n)=>{const x=new Date(d+'T12:00:00Z');x.setUTCDate(x.getUTCDate()+n);return x.toISOString().slice(0,10)};
+const addM=(d,n)=>{let[y,m,j]=d.split('-').map(Number);m+=n;y+=Math.floor((m-1)/12);m=(m-1)%12+1;const l=new Date(Date.UTC(y,m,0)).getUTCDate();return`${y}-${String(m).padStart(2,'0')}-${String(Math.min(j,l)).padStart(2,'0')}`};
+const nid=a=>a.reduce((m,x)=>Math.max(m,x.id),0)+1;
+async function H(s){try{const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('cajet|'+String(s).trim()));return[...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}catch(e){return'p:'+btoa(unescape(encodeURIComponent(String(s).trim())))}}
+/* ===== DONNÉES (feuilles Excel → tableaux) ===== */
+const seed=()=>({clients:[{id:'CL-20260219205217',nom:'DOBLOKOU',pre:'KODZO',sx:'Masculin',dn:'1984-06-25',tel:'70096508',d:'2026-02-19'},{id:'CL-20260219211102',nom:'GBADAGBA',pre:'AFI',sx:'Féminin',dn:'1999-12-02',tel:'79465177',d:'2026-02-19'}],
+comptes:[{id:1,idc:'CL-20260219205217',type:'Tontine',num:'0101 275 00000000 45',si:0,nom:'DOBLOKOU KODZO',mise:500,debut:'',fin:'',k:0},{id:2,idc:'CL-20260219211102',type:'Tontine',num:'0101 275 00000001 42',si:0,nom:'GBADAGBA AFI',mise:1000,debut:'',fin:'',k:0}],
+prets:[],tx:[],ton:[],rec:[{d:'2026-02-19',o:'Ouverture compte',l:'Frais carnet tontine',m:450},{d:'2026-02-19',o:'Ouverture compte',l:'Frais carnet tontine',m:300}],
+cais:[],caisses:[],clot:[],p:{caissier:'',caisse:0,devise:'XOF',pen:'',fin:''},auth:{user:'',admin:null}});
+const FB='https://cajet-togo-default-rtdb.firebaseio.com',MINP=10;/* ADRESSE FIREBASE Realtime Database (ex. https://nom-projet-default-rtdb.firebaseio.com) — vide = mode local, sans partage */
+let D=JSON.parse(localStorage.getItem(K)||'null')||seed(),S=null,AV={},KD=null,KA=null,ET=null,CUR='home',PQ=Promise.resolve();
+const norm=()=>{D.auth=D.auth||{};D.ag=D.ag||[]};norm();
+const fj=(p,o)=>fetch(FB+'/cajet/'+p+'.json',o);
+/* ===== CHIFFREMENT : les données stockées dans Firebase sont illisibles sans mot de passe ===== */
+const b64=a=>{let t='';for(const x of new Uint8Array(a))t+=String.fromCharCode(x);return btoa(t)},ub=t=>Uint8Array.from(atob(t),c=>c.charCodeAt(0)),rnd=n=>crypto.getRandomValues(new Uint8Array(n)),TE=new TextEncoder(),TD=new TextDecoder();
+const KM=async(p,sl)=>crypto.subtle.deriveKey({name:'PBKDF2',salt:sl,iterations:250000,hash:'SHA-256'},await crypto.subtle.importKey('raw',TE.encode(String(p).trim()),'PBKDF2',false,['deriveKey']),{name:'AES-GCM',length:256},false,['encrypt','decrypt']);
+const NK=()=>crypto.subtle.generateKey({name:'AES-GCM',length:256},true,['encrypt','decrypt']);
+const enc=async(k,t)=>{const iv=rnd(12);return{i:b64(iv),c:b64(await crypto.subtle.encrypt({name:'AES-GCM',iv},k,TE.encode(t)))}};
+const dec=async(k,o)=>TD.decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:ub(o.i)},k,ub(o.c)));
+const uid=u=>H('id|'+String(u).trim().toLowerCase());
+async function putWrap(path,u,p,K){const sl=rnd(16),w=await enc(await KM(p,sl),b64(await crypto.subtle.exportKey('raw',K)));w.s=b64(sl);const r=await fj(path+'/'+await uid(u),{method:'PUT',body:JSON.stringify(w)});if(!r.ok)throw Error('Synchronisation impossible')}
+async function unwrap(p,o){try{return await crypto.subtle.importKey('raw',ub(await dec(await KM(p,ub(o.s)),o)),'AES-GCM',true,['encrypt','decrypt'])}catch(e){E('Mot de passe incorrect')}}
+const setKA=async()=>{KA=await crypto.subtle.importKey('raw',ub(D.auth.ka),'AES-GCM',true,['encrypt','decrypt'])};
+async function pull(){if(!FB)return;const r=await fj('data',{headers:{'X-Firebase-ETag':'true'}});if(!r.ok)throw Error('Synchronisation impossible');ET=r.headers.get('ETag');const j=await r.json();if(j&&j.c){D=JSON.parse(await dec(KD,j));norm()}}
+async function push(){try{const r=await fj('data',{method:'PUT',headers:{'if-match':ET||'null_etag','X-Firebase-ETag':'true'},body:JSON.stringify(await enc(KD,JSON.stringify(D)))});
+ if(r.status==412){await pull();alert("Un autre utilisateur vient de modifier les données : votre dernière action n'a pas été enregistrée. Recommencez-la.");go(CUR);return}
+ if(!r.ok)throw 0;ET=r.headers.get('ETag')||(await fj('data',{headers:{'X-Firebase-ETag':'true'}})).headers.get('ETag');
+ const ag={};for(const a of D.ag.filter(a=>a.st!='Inactif'))ag[await uid(a.nom)]=a.nom+' '+a.pre;
+ await fj('agentview',{method:'PUT',body:JSON.stringify(await enc(KA,JSON.stringify({ag,comptes:D.comptes.filter(c=>c.type=='Tontine').map(c=>({num:c.num,nom:c.nom,mise:c.mise}))})))})}catch(e){$('#who').textContent+=' ⚠ hors ligne'}}
+const save=()=>{if(FB)PQ=PQ.then(push);else localStorage.setItem(K,JSON.stringify(D))};
+async function traiter(){if(!FB||!S||S.role=='agent')return;const q=await(await fj('queue')).json();if(!q)return;let n=0;const bad={};
+ for(const[k,e]of Object.entries(q)){if(D.tx.some(t=>t.qid==k))continue;let x;try{x=JSON.parse(await dec(KA,e))}catch(_){bad[k]=1;continue}const c=cpt(x.num);
+  if(c&&c.type=='Tontine'&&+x.m>0&&+x.m>=c.mise){const t={id:nid(D.tx),num:c.num,idc:c.id,d:x.d,h:x.h,type:'Dépôt',m:+x.m,nom:c.nom,caissier:'Agent '+x.ag,idCaisse:0,qid:k};D.tx.push(t);cycle(c,t.m,x.d,t.id);const l=D.ton[D.ton.length-1];l.caissier='Agent '+x.ag;l.idCaisse=0;n++}else bad[k]=1}
+ if(n)save();await PQ;
+ for(const k of Object.keys(q))if(bad[k]||D.tx.some(t=>t.qid==k))await fj('queue/'+k,{method:'DELETE'})}
+setInterval(async()=>{if(!FB||!S||S.role=='agent'||$('#m').className||document.hidden)return;try{await PQ;await pull();await traiter();if(CUR=='home'||LS[CUR])go(CUR)}catch(e){}},20000);
+/* ===== LOGIQUE MÉTIER (portage du VBA) ===== */
+function rib(type){const r={Tontine:[0,3],Courant:[4,6],Epargne:[7,9]}[type]||E('Type de compte invalide');
+ const used=new Set(D.comptes.map(c=>num(c.num).substr(7,8)));
+ for(let p=r[0];p<=r[1];p++)for(let s=0;s<1e7;s++){const n=p+String(s).padStart(7,'0');if(!used.has(n)){let x=0;for(const ch of'0101275'+n+'00')x=(x*10+ +ch)%97;return'0101 275 '+n+' '+String(97-x).padStart(2,'0')}}E('Plage de numéros épuisée')}
+const cpt=q=>D.comptes.find(c=>num(c.num)==num(q));
+const solde=n=>{const c=cpt(n);let s=c?c.si:0;D.tx.filter(t=>num(t.num)==num(n)).forEach(t=>{s+=/^(d[ée]p[ôo]t|pr[êe]t)$/i.test(t.type.trim())?t.m:-t.m});return s};
+function addClient(f){if(!f.nom.trim()||!f.pre.trim())E('Nom et Prénom obligatoires');const n=new Date(),p=x=>String(x).padStart(2,'0');
+ D.clients.push({id:'CL-'+n.getFullYear()+p(n.getMonth()+1)+p(n.getDate())+p(n.getHours())+p(n.getMinutes())+p(n.getSeconds()),nom:f.nom.trim().toUpperCase(),pre:f.pre.trim(),sx:f.sx,dn:f.dn,tel:f.tel,d:T()});save()}
+function addCompte(f){const cl=D.clients.find(c=>c.id==f.idc)||E('Choisir un client');const mise=+f.mise;
+ if(f.type=='Tontine'&&!(mise>0))E('Mise journalière invalide');
+ D.comptes.push({id:nid(D.comptes),idc:cl.id,type:f.type,num:rib(f.type),si:+f.si||0,nom:cl.nom+' '+cl.pre,mise:f.type=='Tontine'?mise:0,debut:'',fin:'',k:0});
+ const fr={Tontine:['Frais carnet tontine',300],Epargne:['Frais ouverture épargne',7000],Courant:['Frais ouverture Courant',7000]}[f.type];
+ D.rec.push({d:T(),o:'Ouverture compte',l:fr[0],m:fr[1]});save()}
+function cycle(c,m,d,id){if(!c.debut||d>c.fin){c.debut=d;c.fin=addD(d,30);c.k=0}
+ let inst=0;if(c.k!=1){inst=c.mise;c.k=1}
+ D.ton.push({id,num:c.num,idc:c.id,d,type:'Dépôt Tontine',m,nom:c.nom,caissier:D.p.caissier,idCaisse:D.p.caisse,net:m-inst,inst,nb:Math.floor(m/c.mise)})}
+function operation(n,type,m,d){const c=cpt(n)||E('Compte introuvable');m=+m;if(!A()&&!caisseDuCaissier())E('Aucune caisse ne vous est attribuée. Demandez à l’administrateur de vous ouvrir une caisse.');
+ if(!D.p.caisse)E('Aucune caisse ouverte');if(!(m>0))E('Montant invalide');
+ if(type=='Retrait'&&solde(c.num)<m)E('Solde insuffisant pour effectuer ce retrait');
+ if(c.type=='Tontine'&&type=='Dépôt'&&m<c.mise)E('Montant insuffisant pour au moins une cotisation ('+fm(c.mise)+')');
+ const t={id:nid(D.tx),num:c.num,idc:c.id,d,h:new Date().toLocaleTimeString('fr-FR'),type,m,nom:c.nom,caissier:D.p.caissier,idCaisse:D.p.caisse};D.tx.push(t);
+ D.caisses.find(k=>k.id==D.p.caisse).solde+=type=='Dépôt'?m:-m;
+ if(c.type=='Tontine'&&type=='Dépôt')cycle(c,m,d,t.id);save();return t}
+function tableau(m,taux,n,d0){const it=m*taux/100*n/12,mens=Math.round((m+it)/n*100)/100;let s=m;const rows=[];
+ for(let i=1;i<=n;i++){rows.push([i,addM(d0,i-1),mens,s,s-m/n]);s-=m/n}return{rows,mens,tot:Math.round(mens*n*100)/100}}
+function addPret(f){const c=cpt(f.num)||E('Compte introuvable'),m=+f.m,n=+f.n,tx=+f.taux;
+ if(!D.p.caisse)E("Aucune caisse ouverte. Impossible d'enregistrer le prêt.");if(!(m>0&&n>0&&f.d0))E('Champs obligatoires manquants');
+ const{mens}=tableau(m,tx,n,f.d0);D.prets.push({id:nid(D.prets),num:c.num,idc:c.id,nom:c.nom,m,n,taux:tx,mens,d0:f.d0,d1:addM(f.d0,n),type:f.type,penal:0,dette:0,mois:''});
+ D.tx.push({id:nid(D.tx),num:c.num,idc:c.id,d:T(),type:'Prêt',m,nom:c.nom,caissier:D.p.caissier,idCaisse:D.p.caisse});
+ D.rec.push({d:T(),o:c.num,l:'Frais de dossier',m:m*0.03});save();return{c,m,tx,n,d0:f.d0}}
+function prelever(dj){let k=0;D.prets.forEach(p=>{if(dj>=p.d0&&dj<=p.d1){D.tx.push({id:nid(D.tx),num:p.num,idc:p.idc,d:dj,type:'Remboursement',m:p.mens,nom:p.nom,caissier:'Système'});D.rec.push({d:dj,o:p.num,l:'Intérêt mensualité prêt',m:Math.round(p.m*p.taux/100/12*100)/100});k++}});D.p.fin=dj;save();return k}
+function penal(dj){const mo=dj.slice(0,7);let k=0;D.prets.filter(p=>p.type=='Tontine'&&p.mois!=mo).forEach(p=>{
+ const tot=D.ton.filter(t=>num(t.num)==num(p.num)&&t.d.slice(0,7)==mo).reduce((s,t)=>s+t.m,0),imp=p.mens-tot;p.mois=mo;if(imp<=0)return;
+ const pen=Math.round(imp*.05);p.penal=pen;p.dette+=pen;k++;
+ D.tx.push({id:nid(D.tx),num:p.num,idc:p.idc,d:dj,type:'Pénalité retard crédit Tontine',m:pen,nom:p.nom,caissier:'Système'});D.rec.push({d:dj,o:p.num,l:'Pénalité crédit Tontine',m:pen})});save();return k}
+function auto(){const dj=T();
+ if(!D.p.pen)D.p.pen=dj;else if((+dj.slice(0,4)-+D.p.pen.slice(0,4))*12+ +dj.slice(5,7)-+D.p.pen.slice(5,7)>=1){penal(dj);D.p.pen=dj}
+ if(addD(dj,1).slice(8)=='01'&&(D.p.fin||'').slice(0,7)!=dj.slice(0,7))prelever(dj);save()}
+function ouvrir(f){if(!A())E('Seul l’administrateur peut ouvrir une caisse');if(D.p.caisse)E('Une caisse est déjà ouverte');const s=+f.s;if(!f.c||!(s>=0)||f.s==='')E('Champs obligatoires manquants');
+ const k={id:nid(D.caisses),caissier:f.c,solde0:s,solde:s,statut:'OUVERTE',d:T()};D.caisses.push(k);D.p.caissier=f.c;D.p.caisse=k.id;save()}
+function cloturer(reel){if(!A())E('Seul l’administrateur peut clôturer la caisse');const k=D.caisses.find(x=>x.id==D.p.caisse)||E('Aucune caisse ouverte');if(reel===''||isNaN(reel))E('Saisir le solde réel');
+ D.clot.push({id:k.id,caissier:k.caissier,d:T(),theo:k.solde,reel:+reel,ecart:+reel-k.solde});k.statut='FERMEE';D.p.caissier='';D.p.caisse=0;save()}
+async function addCaissier(f){if(!A())E("Réservé à l'administrateur");if(!f.nom||!f.pre||!f.mdp)E('Nom, Prénom et Mot de passe obligatoires');if(FB&&f.mdp.trim().length<MINP)E('Mot de passe : '+MINP+' caractères minimum');const idn=f.nom.trim().toLowerCase();if(idn==D.auth.user||D.cais.some(x=>x.nom.trim().toLowerCase()==idn)||D.ag.some(x=>x.nom.trim().toLowerCase()==idn))E('Cet identifiant (nom) existe déjà');const{mdp,...r}=f;r.nom=f.nom.trim();D.cais.push({id:nid(D.cais),...r,h:await H(mdp)});if(FB&&r.st!='Inactif')await putWrap('ku',r.nom,mdp,KD);save()}
+async function login(u,p){u=u.trim().toLowerCase();
+ if(FB){const id=await uid(u);let w=await(await fj('ka/'+id)).json();
+  if(w){KA=await unwrap(p,w);AV=JSON.parse(await dec(KA,await(await fj('agentview')).json()));S={role:'agent',nom:AV.ag[id]||u};return}
+  w=await(await fj('ku/'+id)).json()||E('Identifiant inconnu');KD=await unwrap(p,w);await pull();await setKA();
+  if(D.auth.user&&u==D.auth.user)S={role:'admin',nom:'Administrateur'};else{const c=D.cais.find(x=>x.nom.trim().toLowerCase()==u)||E('Identifiant inconnu');if(c.st=='Inactif')E('Ce caissier est inactif');S={role:'caissier',nom:c.nom}}
+  auto();await traiter().catch(()=>0);return}
+ const h=await H(p);
+ if(D.auth.user&&u==D.auth.user){if(h!=D.auth.admin)E("Mot de passe incorrect pour l'administrateur");S={role:'admin',nom:'Administrateur'}}
+ else{const c=D.cais.find(x=>x.nom.trim().toLowerCase()==u)||E('Identifiant inconnu');if(c.st=='Inactif')E('Ce caissier est inactif');if(c.h!=h)E('Mot de passe incorrect');S={role:'caissier',nom:c.nom}}auto()}
+/* ===== INTERFACE ===== */
+const V=h=>$('#v').innerHTML=h,cl=()=>{$('#m').className=''},A=()=>S.role=='admin',opt=o=>Array.isArray(o)?o:[o,o];
+function form(title,fs,ok,btn='Enregistrer'){$('#m').innerHTML=`<div class=sheet><h3>${title}</h3><form id=f>${fs.map(f=>`<label>${f.l}${f.t=='select'?`<select name=${f.n}>${f.o.map(o=>{o=opt(o);return`<option value="${o[0]}">${o[1]}</option>`}).join('')}</select>`:`<input name=${f.n} type=${f.t||'text'} value="${f.v??''}" step=any ${f.r?'required':''}>`}</label>`).join('')}<p id=er class=er></p><button>${btn}</button> <button type=button class=g onclick=cl()>Annuler</button></form></div>`;
+ $('#m').className='on';$('#f').onsubmit=async e=>{e.preventDefault();try{await ok(Object.fromEntries(new FormData(e.target)))}catch(x){$('#er').textContent=x.message}}}
+const comptesOpt=()=>D.comptes.map(c=>[c.num,c.num+' — '+c.nom]);
+function caisseDuCaissier(){if(A())return true;const c=D.cais.find(x=>x.nom.trim().toLowerCase()==S.nom.trim().toLowerCase());return !!(c&&D.p.caisse&&D.p.caissier.trim().toLowerCase()===(c.nom+' '+c.pre).trim().toLowerCase())}
+function shell(){if(S&&S.role=='agent'){$('#who').textContent=S.nom+' · Agent de terrain';$('#nv').innerHTML='';return}$('#who').textContent=S?(S.nom+(D.p.caisse?' · Caisse '+fm(D.caisses.find(k=>k.id==D.p.caisse).solde):' · caisse fermée')):'';
+ $('#nv').innerHTML=S?`<button onclick="go('home')">🏠 Tableau de bord</button>`:''}
+const ADM=['rec','cais','ag','caisses','clot','tx','ton','clients','prets'];
+function go(v,a){CUR=v;if(S&&S.role=='agent')return agentView();cl();shell();if(ADM.includes(v)&&!A())return home();if(v=='home')return home();if(v=='op')return opForm();if(!LS[v])return home();list(v)}
+const adminOnly=f=>{if(!A()){alert("Réservé à l'administrateur");return false}return true};
+function tile(t,f,c){return`<button class="${c||''}" onclick="${f}">${t}</button>`}
+function sec(t,a){return`<h4 style="margin:14px 2px 8px;color:var(--m)">${t}</h4><div class="grid">${a.join('')}</div>`}
+function home(){shell();const n=t=>D.comptes.filter(c=>c.type==t).length,k=D.caisses.find(x=>x.id==D.p.caisse);
+ V(`${A()?`<div class="card" style="padding:8px 12px;font-size:12px;color:var(--m)">Clients : <b>${D.clients.length}</b> · Comptes : <b>${D.comptes.length}</b> (Tontine ${n('Tontine')}, Courant ${n('Courant')}, Épargne ${n('Epargne')}) · Recettes : <b>${fm(D.rec.reduce((s,r)=>s+r.m,0))} FCFA</b> · Caisse : <b>${k?fm(k.solde)+' FCFA':'fermée'}</b></div>`:''}`
+ +sec('Caisse',[...(A()?[D.p.caisse?tile('🔒 Clôturer la caisse','clotForm()'):tile('🔓 Ouvrir la caisse','ouvForm()')]:[]),tile('💰 Opération (dépôt / retrait)',"go('op')")])
+ +sec('Clients et comptes',[tile('👤 Nouveau client','cliForm()'),tile('📒 Nouveau compte','cptForm()'),tile('🔎 Fiche client','ficheForm()'),...(A()?[tile('📋 Liste des clients',"go('clients')",'g')]:[]),tile('📂 Liste des comptes',"go('comptes')",'g')])
+ +sec('Crédits',[tile('🏦 Nouveau prêt','pretForm()'),tile('🧮 Simulation','simForm()'),...(A()?[tile('📑 Liste des prêts',"go('prets')",'g')]:[])])
+ +(A()?sec('Historiques',[tile('🧾 Transactions',"go('tx')",'g'),tile('🌾 Tontine',"go('ton')",'g')]):'')
+ +(A()?sec('Administration',[tile('💵 Recettes',"go('rec')",'g'),tile('🧑‍💼 Caissiers',"go('cais')",'g'),tile('🚶 Agents de terrain',"go('ag')",'g'),tile('➕ Enregistrer un agent','agForm()'),tile('🗄️ Caisses',"go('caisses')",'g'),tile('✅ Clôtures de caisse',"go('clot')",'g'),tile('➕ Enregistrer un caissier','caisForm()'),tile('🔐 Mot de passe d\'un caissier','resetCais()','g'),tile('📆 Prélever les mensualités','doPrel()','g'),tile('⚠️ Pénalités crédit tontine','doPen()','g')]):'')
+ +(A()?sec('Données',[tile('🔗 Envoyer le lien de l\'application','partager()'),tile('⬇️ Exporter une sauvegarde','expo()','g'),tile('⬆️ Importer une sauvegarde',"$('#imp').click()",'g')]):'')+sec('Compte',[tile('🔑 Changer mon mot de passe','chPwd()','g'),tile('🚪 Déconnexion',"S=null;shell();loginView()",'r')])+`<input id=imp type=file accept=".json" hidden onchange="impo(this)">`)}
+const LS={clients:['Clients',()=>D.clients,[['ID',r=>r.id],['Nom',r=>r.nom],['Prénom',r=>r.pre],['Sexe',r=>r.sx],['Naissance',r=>fd(r.dn)],['Tél',r=>r.tel],['Inscrit',r=>fd(r.d)]]],
+comptes:['Comptes',()=>D.comptes,[['ID',r=>r.id],['Type',r=>r.type],['N° compte',r=>r.num],['Client',r=>r.nom],['Mise/jour',r=>r.mise],['Solde',r=>fm(solde(r.num))],['Cycle',r=>r.debut?fd(r.debut)+' → '+fd(r.fin):'']]],
+prets:['Prêts',()=>D.prets,[['ID',r=>r.id],['Compte',r=>r.num],['Client',r=>r.nom],['Type',r=>r.type],['Montant',r=>fm(r.m)],['Durée',r=>r.n],['Taux %',r=>r.taux],['Mensualité',r=>fm(r.mens)],['Début',r=>fd(r.d0)],['Fin',r=>fd(r.d1)],['Dette pénalité',r=>fm(r.dette)]]],
+ag:['Agents de terrain',()=>D.ag,[['ID',r=>r.id],['Nom',r=>r.nom],['Prénoms',r=>r.pre],['Téléphone',r=>r.tel],['Statut',r=>r.st]]],
+tx:['Transactions',()=>D.tx,[['ID',r=>r.id],['Compte',r=>r.num],['Date',r=>fd(r.d)],['Type',r=>r.type],['Montant',r=>fm(r.m)],['Client',r=>r.nom],['Caissier',r=>r.caissier]]],
+ton:['Tontine',()=>D.ton,[['ID',r=>r.id],['Compte',r=>r.num],['Date',r=>fd(r.d)],['Montant',r=>fm(r.m)],['Net client',r=>fm(r.net)],['Institution',r=>fm(r.inst)],['Jours',r=>r.nb],['Client',r=>r.nom]]],
+rec:['Recettes',()=>D.rec,[['Date',r=>fd(r.d)],['Origine',r=>r.o],['Libellé',r=>r.l],['Montant',r=>fm(r.m)]]],
+cais:['Caissiers',()=>D.cais,[['ID',r=>r.id],['Nom',r=>r.nom],['Prénoms',r=>r.pre],['Tél',r=>r.tel],['Statut',r=>r.st],['N° pièce',r=>r.nid]]],
+caisses:['Caisses',()=>D.caisses,[['ID',r=>r.id],['Caissier',r=>r.caissier],['Initial',r=>fm(r.solde0)],['Actuel',r=>fm(r.solde)],['Statut',r=>r.statut],['Date',r=>fd(r.d)]]],
+clot:['Clôtures',()=>D.clot,[['Caisse',r=>r.id],['Caissier',r=>r.caissier],['Date',r=>fd(r.d)],['Théorique',r=>fm(r.theo)],['Réel',r=>fm(r.reel)],['Écart',r=>fm(r.ecart)]]]};
+function list(k){if(ADM.includes(k)&&!A())return home();const[t,rows,cols]=LS[k],R=rows().slice().reverse();
+ V(`<div class=card><h3>${t} (${R.length})</h3><input placeholder="Rechercher…" oninput="const q=this.value.toLowerCase();document.querySelectorAll('#tb tr').forEach(r=>r.style.display=r.textContent.toLowerCase().includes(q)?'':'none')"><div class=tw><table><thead><tr>${cols.map(c=>`<th>${c[0]}</th>`).join('')}</tr></thead><tbody id=tb>${R.map(r=>`<tr>${cols.map(c=>`<td>${c[1](r)??''}</td>`).join('')}</tr>`).join('')}</tbody></table></div><p><button class=g onclick="csv('${k}')">Exporter CSV</button></p></div>`)}
+function dl(n,c,t){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([c],{type:t}));a.download=n;a.click()}
+function csv(k){const[t,rows,cols]=LS[k];dl(t+'.csv','\ufeff'+[cols.map(c=>c[0]),...rows().map(r=>cols.map(c=>c[1](r)))].map(l=>l.map(x=>'"'+String(x??'').replace(/"/g,'""')+'"').join(';')).join('\n'),'text/csv')}
+const expo=()=>dl('CAJET_sauvegarde_'+T()+'.json',JSON.stringify(D),'application/json');
+function impo(i){const f=i.files[0];if(!f)return;f.text().then(x=>{try{const j=JSON.parse(x);if(!j.clients||!j.comptes)throw 0;if(confirm('Remplacer toutes les données actuelles ?')){D=j;save();go('home')}}catch(e){alert('Fichier invalide')}})}
+function opForm(){if(!A()&&!caisseDuCaissier()){alert('Aucune caisse ne vous est attribuée. Demandez à l’administrateur de vous ouvrir une caisse.');return}form('Opération',[{n:'num',l:'Compte',t:'select',o:comptesOpt()},{n:'type',l:'Type',t:'select',o:['Dépôt','Retrait']},{n:'m',l:'Montant (FCFA)',t:'number',r:1},{n:'d',l:'Date',t:'date',v:T(),r:1}],f=>{const t=operation(f.num,f.type,f.m,f.d);cl();shell();recu(t)},'Enregistrer')}
+function recu(t){const one=l=>`<div class=rc><b>CAJET — Centre d'Appui aux Jeunes Entrepreneurs du Togo</b><h3>REÇU DE TRANSACTION (${l})</h3><p>ID transaction : ${t.id}<br>N° de compte : ${t.num}<br>Client : ${t.nom}<br>Opération : ${t.type}<br><b>Montant : ${fm(t.m)} FCFA</b><br>Date et heure : ${fd(t.d)} ${t.h||''}<br>Caissier : ${t.caissier}</p><p>Signature client : ____________ &nbsp; Signature caissier : ____________</p></div>`;
+ V(`<div class=np><button onclick=print()>Imprimer</button> <button class=g onclick="go('home')">Fermer</button></div><br>`+one('Client')+one('Institution'))}
+function cliForm(){form('Nouveau client',[{n:'nom',l:'Nom',r:1},{n:'pre',l:'Prénom(s)',r:1},{n:'sx',l:'Sexe',t:'select',o:['Masculin','Féminin']},{n:'dn',l:'Date de naissance',t:'date'},{n:'tel',l:'Téléphone',t:'tel'}],f=>{addClient(f);cl();go('clients')})}
+function cptForm(){form('Nouveau compte',[{n:'idc',l:'Client',t:'select',o:D.clients.map(c=>[c.id,c.nom+' '+c.pre])},{n:'type',l:'Type',t:'select',o:['Tontine','Courant','Epargne']},{n:'mise',l:'Mise journalière (tontine)',t:'number'},{n:'si',l:'Solde initial',t:'number',v:0}],f=>{addCompte(f);cl();go('comptes')})}
+function pretFs(){return[{n:'num',l:'Compte',t:'select',o:comptesOpt()},{n:'type',l:'Type de crédit',t:'select',o:['Scolaire','Urgence','Tontine','Prêt de roulement','Prêt saisonnier']},{n:'taux',l:'Taux annuel %',t:'select',o:Array.from({length:46},(_,i)=>i+5)},{n:'m',l:'Montant',t:'number',r:1},{n:'n',l:'Durée (mois)',t:'number',r:1},{n:'d0',l:'Début remboursement',t:'date',v:T(),r:1}]}
+function pretForm(){form('Nouveau prêt',pretFs(),f=>{const p=addPret(f);cl();shell();tab(p.c.nom,p.c.num,p.m,p.tx,p.n,p.d0)},'Valider')}
+function simForm(){form('Simulation de prêt',pretFs(),f=>{const c=cpt(f.num)||E('Compte introuvable');if(!(+f.m>0&&+f.n>0))E('Champs obligatoires manquants');cl();tab(c.nom,c.num,+f.m,+f.taux,+f.n,f.d0)},'Simuler')}
+function tab(nom,n,m,tx,d,d0){const t=tableau(m,tx,d,d0);V(`<div class=np><button onclick=print()>Imprimer</button> <button class=g onclick="go('home')">Fermer</button></div><div class=card><h3>Tableau de remboursement</h3><p>${nom}<br>Compte : ${n}</p><div class=tw><table><tr><th>N°</th><th>Échéance</th><th>Mensualité</th><th>Solde avant</th><th>Solde après</th></tr>${t.rows.map(r=>`<tr><td>${r[0]}</td><td>${fd(r[1])}</td><td>${fm(r[2])}</td><td>${fm(r[3])}</td><td>${fm(r[4])}</td></tr>`).join('')}</table></div><p><b>Emprunté : ${fm(m)} FCFA<br>Total remboursé : ${fm(t.tot)} FCFA<br>Intérêts : ${fm(t.tot-m)} FCFA</b></p></div>`)}
+function ficheForm(){form('Fiche client',[{n:'q',l:'N° de compte ou Nom et Prénom',r:1}],f=>{fiche(f.q);cl()},'Rechercher')}
+function fiche(q){const c=cpt(q)||D.comptes.find(x=>x.nom.toUpperCase()==q.trim().toUpperCase())||E('Client introuvable'),tx=D.tx.filter(t=>num(t.num)==num(c.num)),
+ sm=re=>tx.filter(t=>re.test(t.type.toLowerCase())).reduce((s,t)=>s+t.m,0),dep=sm(/^d[ée]p[ôo]t$/),pre=sm(/^pr[êe]t$/),ret=sm(/^retrait$/),rem=sm(/^remboursement$/),pen=tx.reduce((s,t)=>s+t.m,0)-dep-pre-ret-rem;
+ const ps=D.prets.filter(p=>num(p.num)==num(c.num));
+ const loanHtml=ps.length?`<h4>Informations sur les prêts</h4><div class=tw><table><tr><th>Type</th><th>Montant initial</th><th>Mensualité</th><th>Remboursements enregistrés</th><th>Pénalités dues</th></tr>${ps.map(p=>{const pay=tx.filter(t=>t.type==='Remboursement'&&t.d>=p.d0&&t.d<=p.d1).reduce((s,t)=>s+t.m,0);return`<tr><td>${p.type}</td><td>${fm(p.m)}</td><td>${fm(p.mens)}</td><td>${fm(pay)}</td><td>${fm(p.dette||0)}</td></tr>`}).join('')}</table></div>`:'<p>Aucun prêt enregistré pour ce compte.</p>';
+ V(`<div class=np><button onclick=print()>Imprimer</button> <button class=g onclick="go('home')">Fermer</button></div><div class=card><h3>Historique des transactions</h3><p>N° compte : ${c.num}<br>Client : ${c.nom}</p><div class=tw><table><tr><th>Date</th><th>Type</th><th>Montant</th></tr>${tx.map(t=>`<tr><td>${fd(t.d)}</td><td>${t.type}</td><td>${fm(t.m)}</td></tr>`).join('')}</table></div><h4>Résumé</h4><p>Solde initial : ${fm(c.si)}<br>Total dépôts : ${fm(dep)}<br>Total prêts : ${fm(pre)}<br>Total retraits : ${fm(ret)}<br>Pénalités retard : ${fm(pen)}<br>Total remboursements : ${fm(rem)}<br><b>SOLDE DISPONIBLE : ${fm(solde(c.num))} FCFA</b></p>${loanHtml}</div>`)}
+function ouvForm(){if(!adminOnly())return;if(!D.cais.length)return alert('Aucun caissier enregistré.');form('Ouverture de caisse — remise de fonds',[{n:'c',l:'Caissier bénéficiaire',t:'select',o:D.cais.map(c=>[c.nom+' '+c.pre,c.nom+' '+c.pre])},{n:'s',l:'Somme remise au caissier (FCFA)',t:'number',r:1}],f=>{ouvrir(f);cl();shell();go('home')},'Ouvrir la caisse')}
+function clotForm(){if(!adminOnly())return;const k=D.caisses.find(x=>x.id==D.p.caisse);if(!k)return alert('Aucune caisse ouverte.');form('Clôture de caisse — solde théorique : '+fm(k.solde),[{n:'r',l:'Solde réel',t:'number',r:1}],f=>{const e=+f.r-k.solde;cloturer(f.r);cl();shell();alert('Caisse clôturée. Écart : '+fm(e));go('home')},'Clôturer')}
+function caisForm(){if(!adminOnly())return;const fs=[['nom','Nom'],['pre','Prénoms'],['dn','Date de naissance','date'],['ln','Lieu de naissance'],['adr','Adresse'],['tel','Téléphone','tel'],['nid','N° carte/pièce'],['mdp','Mot de passe','password']].map(a=>({n:a[0],l:a[1],t:a[2]}));
+ fs.splice(6,0,{n:'st',l:'Statut',t:'select',o:['Actif','Inactif']},{n:'sit',l:'Situation matrimoniale',t:'select',o:['Célibataire sans enfants','Célibataire avec 1 enfant','Célibataire avec 2 enfants','Marié','Divorcé']});
+ fs.push({n:'r1',l:'Personne à prévenir 1 (nom, tél)'},{n:'r2',l:'Personne à prévenir 2 (nom, tél)'});form('Nouveau caissier — identifiant de connexion = Nom',fs,async f=>{await addCaissier(f);cl();go('cais');alert('Caissier enregistré.\nIdentifiant de connexion : '+f.nom.trim()+'\nMot de passe : celui que vous venez de saisir.')})}
+function doPrel(){if(!adminOnly())return;if(D.p.fin&&D.p.fin.slice(0,7)==T().slice(0,7)&&!confirm('Les mensualités de ce mois ont déjà été prélevées. Continuer ?'))return;if(confirm('Prélever les mensualités des prêts en cours ?'))alert(prelever(T())+' prêt(s) traité(s).')}
+function doPen(){if(!adminOnly())return;alert(penal(T())+' pénalité(s) appliquée(s).')}
+async function addAgent(f){if(!A())E("Réservé à l'administrateur");if(!f.nom||!f.pre||!f.mdp)E('Nom, Prénom et Mot de passe obligatoires');if(FB&&f.mdp.trim().length<MINP)E('Mot de passe : '+MINP+' caractères minimum');const idn=f.nom.trim().toLowerCase();if(idn==D.auth.user||D.cais.some(x=>x.nom.trim().toLowerCase()==idn)||D.ag.some(x=>x.nom.trim().toLowerCase()==idn))E('Cet identifiant (nom) existe déjà');D.ag.push({id:nid(D.ag),nom:f.nom.trim(),pre:f.pre,tel:f.tel,st:f.st,h:await H(f.mdp)});if(FB&&f.st!='Inactif')await putWrap('ka',f.nom,f.mdp,KA);save()}
+function partager(){const u=location.href.split('#')[0].split('?')[0];
+ if(!/^https?:/.test(u)){alert("Le lien n'existe que lorsque l'application est hébergée sur Internet (ex. GitHub Pages). Ouvrez-la depuis son adresse Internet pour envoyer le lien.");return}
+ const t="Application CAJET : "+u;window._lk=u;
+ $('#m').innerHTML=`<div class=sheet><h3>Envoyer le lien</h3><p style="word-break:break-all"><b>${u}</b></p><p style="color:var(--m);font-size:13px">Chaque personne se connecte avec son identifiant et son mot de passe (caissier ou agent de terrain) et voit uniquement son interface.</p><p><a href="https://wa.me/?text=${encodeURIComponent(t)}" target=_blank><button type=button>Envoyer par WhatsApp</button></a></p>${navigator.share?'<p><button type=button onclick="navigator.share({title:\'CAJET\',url:window._lk})">Partager (SMS, e-mail…)</button></p>':''}<p><button type=button onclick="navigator.clipboard.writeText(window._lk).then(()=>alert(\'Lien copié\'))">Copier le lien</button></p><button type=button class=g onclick=cl()>Fermer</button></div>`;$('#m').className='on'}
+function agForm(){if(!adminOnly())return;form('Nouvel agent de terrain — identifiant = Nom',[{n:'nom',l:'Nom',r:1},{n:'pre',l:'Prénoms',r:1},{n:'tel',l:'Téléphone',t:'tel'},{n:'st',l:'Statut',t:'select',o:['Actif','Inactif']},{n:'mdp',l:'Mot de passe',t:'password',r:1}],async f=>{await addAgent(f);cl();go('ag');alert('Agent enregistré.\nIdentifiant de connexion : '+f.nom.trim()+'\nMot de passe : celui que vous venez de saisir.')})}
+function agentView(){shell();const L=(AV.comptes||[]).slice().sort((a,b)=>a.nom.localeCompare(b.nom)),mine=[];
+ V(`<div class=card><h3>Dépôt tontine</h3><form id=af><label>Rechercher un client<input id=sr placeholder="Tapez un nom"></label><label>Client (compte tontine)<select name=num id=sl></select></label><p id=an style="color:var(--m)"></p><label>Montant déposé (FCFA)<input name=m type=number min=1 step=any required></label><p class=er id=er></p><button>Enregistrer le dépôt</button></form></div><div class=card><b>Mes dépôts de cette session</b><div id=mine style="margin-top:6px">Aucun</div></div><p><button class=r onclick="loginView()">Déconnexion</button></p>`);
+ const fill=()=>{const q=$('#sr').value.toLowerCase();$('#sl').innerHTML=L.filter(c=>c.nom.toLowerCase().includes(q)).map(c=>`<option value="${c.num}">${c.nom} — ${c.num}</option>`).join('');info()},info=()=>{const c=L.find(x=>x.num==$('#sl').value);$('#an').textContent=c?`N° de compte : ${c.num} · Cotisation minimale : ${fm(c.mise)} FCFA`:'Aucun compte tontine trouvé'};
+ $('#sr').oninput=fill;$('#sl').onchange=info;fill();
+ $('#af').onsubmit=async e=>{e.preventDefault();const f=Object.fromEntries(new FormData(e.target)),c=L.find(x=>x.num==f.num);try{if(!c)E('Choisissez un client');if(!(+f.m>0))E('Montant invalide');if(+f.m<c.mise)E('Montant insuffisant : minimum '+fm(c.mise)+' FCFA');
+  const r=await fj('queue',{method:'POST',body:JSON.stringify(await enc(KA,JSON.stringify({ag:S.nom,num:c.num,m:+f.m,d:T(),h:new Date().toLocaleTimeString('fr-FR')})))});if(!r.ok)throw 0;
+  mine.unshift(`✔ ${c.nom} (${c.num}) — ${fm(+f.m)} FCFA — ${new Date().toLocaleTimeString('fr-FR')}`);$('#mine').innerHTML=mine.join('<br>');e.target.m.value='';$('#er').textContent=''}catch(x){$('#er').textContent=x.message||'Dépôt NON envoyé : vérifiez la connexion Internet'}}}
+async function loginView(){S=null;KD=null;KA=null;shell();let first=!D.auth.user||!D.auth.admin;
+ if(FB){try{first=!(await(await fj('init')).json())}catch(e){V('<div class=card><p class=er>Connexion Internet requise.</p><button onclick=loginView()>Réessayer</button></div>');return}}
+ V(`<div class=card><h3>${first?"Première utilisation : compte administrateur":'Connexion'}</h3>${first?'<p style="color:var(--m);font-size:13px">Choisissez l\'identifiant et le mot de passe de l\'administrateur. Notez-les : ils sont demandés à chaque connexion. Les caissiers recevront les leurs à leur enregistrement.</p>':''}<form id=lf><label>Identifiant<input name=u autocapitalize=off autocomplete=username required></label><label>Mot de passe${first?' ('+MINP+' caractères minimum)':''}<input name=p type=password autocomplete=current-password required></label>${first?'<label>Confirmer le mot de passe<input name=p2 type=password required></label>':''}<label style="display:flex;gap:8px;align-items:center"><input type=checkbox style="width:auto;margin:0" onchange="document.querySelectorAll('#lf input[name^=p]').forEach(i=>i.type=this.checked?'text':'password')"> Afficher le mot de passe</label><p class=er id=er></p><button>${first?'Créer le compte administrateur':'Se connecter'}</button></form></div>`);
+ $('#lf').onsubmit=async e=>{e.preventDefault();const f=Object.fromEntries(new FormData(e.target));try{if(first){const u=f.u.trim().toLowerCase();if(u.length<3)E("L'identifiant doit avoir 3 caractères minimum");if(D.cais.some(x=>x.nom.trim().toLowerCase()==u))E('Cet identifiant est déjà utilisé par un caissier');if(f.p.trim().length<MINP)E(MINP+' caractères minimum');if(f.p!==f.p2)E('Les deux mots de passe ne sont pas identiques');D.auth.user=u;D.auth.admin=await H(f.p);if(FB){KD=await NK();const ka=await NK();D.auth.ka=b64(await crypto.subtle.exportKey('raw',ka));await setKA();await putWrap('ku',u,f.p,KD);S={role:'admin',nom:'Administrateur'};save();await PQ;await fj('init',{method:'PUT',body:'1'});S=null}else{save();await PQ}alert('Compte administrateur créé. Connectez-vous avec cet identifiant et ce mot de passe.');loginView()}else{await login(f.u,f.p);go('home')}}catch(x){$('#er').textContent=x.message}}}
+async function chPwd(){form('Changer mon mot de passe',[{n:'o',l:'Ancien mot de passe',t:'password',r:1},{n:'n',l:'Nouveau mot de passe (6 caractères minimum)',t:'password',r:1},{n:'n2',l:'Confirmer le nouveau mot de passe',t:'password',r:1}],async f=>{
+ const c=A()?null:D.cais.find(x=>x.nom==S.nom),cur=A()?D.auth.admin:c&&c.h;if(await H(f.o)!=cur)E('Ancien mot de passe incorrect');if(f.n.trim().length<MINP)E(MINP+' caractères minimum');if(f.n!==f.n2)E('Les deux mots de passe ne sont pas identiques');
+ const h=await H(f.n);if(FB)await putWrap('ku',A()?D.auth.user:c.nom,f.n,KD);if(A())D.auth.admin=h;else c.h=h;save();cl();alert('Mot de passe modifié.')},'Modifier')}
+function resetCais(){if(!adminOnly())return;if(!D.cais.length)return alert('Aucun caissier enregistré.');form("Nouveau mot de passe d'un caissier",[{n:'id',l:'Caissier',t:'select',o:D.cais.map(c=>[c.id,c.nom+' '+c.pre])},{n:'n',l:'Nouveau mot de passe',t:'password',r:1}],async f=>{const c=D.cais.find(x=>x.id==f.id)||E('Caissier introuvable');if(f.n.trim().length<MINP)E(MINP+' caractères minimum');c.h=await H(f.n);if(FB)await putWrap('ku',c.nom,f.n,KD);save();cl();alert('Mot de passe de '+c.nom+' modifié.')},'Modifier')}
+loginView();
+</script></body></html>
