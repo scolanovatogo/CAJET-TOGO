@@ -44,6 +44,10 @@ prets:[],tx:[],ton:[],rec:[{d:'2026-02-19',o:'Ouverture compte',l:'Frais carnet 
 cais:[],caisses:[],clot:[],p:{caissier:'',caisse:0,devise:'XOF',pen:'',fin:''},auth:{user:'',admin:null}});
 const FB='https://cajet-togo-default-rtdb.europe-west1.firebasedatabase.app',MINP=10;/* ADRESSE FIREBASE Realtime Database (ex. https://nom-projet-default-rtdb.firebaseio.com) — vide = mode local, sans partage */
 let D=JSON.parse(localStorage.getItem(K)||'null')||seed(),S=null,AV={},KD=null,KA=null,ET=null,CUR='home',PQ=Promise.resolve();
+function dlg(msg,btns){const m=document.createElement('div');m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:99;padding:20px';
+ m.innerHTML='<div style="background:var(--c);color:inherit;border-radius:14px;padding:18px;max-width:340px;width:100%;box-shadow:0 8px 30px rgba(0,0,0,.3)"><b style="display:block;margin-bottom:8px">CAJET Togo</b><div class=tx style="white-space:pre-line;margin-bottom:14px"></div><div class=bt style="display:flex;gap:8px;justify-content:flex-end"></div></div>';
+ m.querySelector('.tx').textContent=msg;for(const[t,f]of btns){const b=document.createElement('button');b.type='button';b.textContent=t;b.style.width='auto';b.onclick=()=>{m.remove();f&&f()};m.querySelector('.bt').appendChild(b)}document.body.appendChild(m)}
+window.alert=m=>dlg(String(m),[['OK']]);const askC=(m,f)=>dlg(m,[['Non'],['Oui',f]]);
 const norm=()=>{D.auth=D.auth||{};D.ag=D.ag||[]};norm();
 const fj=(p,o)=>fetch(FB+'/cajet/'+p+'.json',o);
 /* ===== CHIFFREMENT : les données stockées dans Firebase sont illisibles sans mot de passe ===== */
@@ -119,6 +123,7 @@ async function login(u,p){u=u.trim().toLowerCase();
   if(w){KA=await unwrap(p,w);AV=JSON.parse(await dec(KA,await(await fj('agentview')).json()));S={role:'agent',nom:AV.ag[id]||u};return}
   w=await(await fj('ku/'+id)).json()||E('Identifiant inconnu');KD=await unwrap(p,w);await pull();await setKA();
   if(D.auth.user&&u==D.auth.user)S={role:'admin',nom:'Administrateur'};else{const c=D.cais.find(x=>x.nom.trim().toLowerCase()==u)||E('Identifiant inconnu');if(c.st=='Inactif')E('Ce caissier est inactif');S={role:'caissier',nom:c.nom}}
+  if(S.role=='admin')try{const rl=await fj('licence');if(rl.ok&&(await rl.json())===null)await fj('licence',{method:'PUT',body:JSON.stringify({actif:true,msg:'Licence désactivée : contactez le fournisseur du logiciel.'})})}catch(e){}
   auto();await traiter().catch(()=>0);return}
  const h=await H(p);
  if(D.auth.user&&u==D.auth.user){if(h!=D.auth.admin)E("Mot de passe incorrect pour l'administrateur");S={role:'admin',nom:'Administrateur'}}
@@ -159,7 +164,7 @@ function list(k){if(ADM.includes(k)&&!A())return home();const[t,rows,cols]=LS[k]
 function dl(n,c,t){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([c],{type:t}));a.download=n;a.click()}
 function csv(k){const[t,rows,cols]=LS[k];dl(t+'.csv','\ufeff'+[cols.map(c=>c[0]),...rows().map(r=>cols.map(c=>c[1](r)))].map(l=>l.map(x=>'"'+String(x??'').replace(/"/g,'""')+'"').join(';')).join('\n'),'text/csv')}
 const expo=()=>dl('CAJET_sauvegarde_'+T()+'.json',JSON.stringify(D),'application/json');
-function impo(i){const f=i.files[0];if(!f)return;f.text().then(x=>{try{const j=JSON.parse(x);if(!j.clients||!j.comptes)throw 0;if(confirm('Remplacer toutes les données actuelles ?')){D=j;save();go('home')}}catch(e){alert('Fichier invalide')}})}
+function impo(i){const f=i.files[0];if(!f)return;f.text().then(x=>{try{const j=JSON.parse(x);if(!j.clients||!j.comptes)throw 0;askC('Remplacer toutes les données actuelles ?',()=>{D=j;save();go('home')})}catch(e){alert('Fichier invalide')}})}
 function opForm(){if(!A()&&!caisseDuCaissier()){alert('Aucune caisse ne vous est attribuée. Demandez à l’administrateur de vous ouvrir une caisse.');return}form('Opération',[{n:'num',l:'Compte',t:'select',o:comptesOpt()},{n:'type',l:'Type',t:'select',o:['Dépôt','Retrait']},{n:'m',l:'Montant (FCFA)',t:'number',r:1},{n:'d',l:'Date',t:'date',v:T(),r:1}],f=>{const t=operation(f.num,f.type,f.m,f.d);cl();shell();recu(t)},'Enregistrer')}
 function recu(t){const one=l=>`<div class=rc><b>CAJET — Centre d'Appui aux Jeunes Entrepreneurs du Togo</b><h3>REÇU DE TRANSACTION (${l})</h3><p>ID transaction : ${t.id}<br>N° de compte : ${t.num}<br>Client : ${t.nom}<br>Opération : ${t.type}<br><b>Montant : ${fm(t.m)} FCFA</b><br>Date et heure : ${fd(t.d)} ${t.h||''}<br>Caissier : ${t.caissier}</p><p>Signature client : ____________ &nbsp; Signature caissier : ____________</p></div>`;
  V(`<div class=np><button onclick=print()>Imprimer</button> <button class=g onclick="go('home')">Fermer</button></div><br>`+one('Client')+one('Institution'))}
@@ -180,7 +185,7 @@ function clotForm(){if(!adminOnly())return;const k=D.caisses.find(x=>x.id==D.p.c
 function caisForm(){if(!adminOnly())return;const fs=[['nom','Nom'],['pre','Prénoms'],['dn','Date de naissance','date'],['ln','Lieu de naissance'],['adr','Adresse'],['tel','Téléphone','tel'],['nid','N° carte/pièce'],['mdp','Mot de passe','password']].map(a=>({n:a[0],l:a[1],t:a[2]}));
  fs.splice(6,0,{n:'st',l:'Statut',t:'select',o:['Actif','Inactif']},{n:'sit',l:'Situation matrimoniale',t:'select',o:['Célibataire sans enfants','Célibataire avec 1 enfant','Célibataire avec 2 enfants','Marié','Divorcé']});
  fs.push({n:'r1',l:'Personne à prévenir 1 (nom, tél)'},{n:'r2',l:'Personne à prévenir 2 (nom, tél)'});form('Nouveau caissier — identifiant de connexion = Nom',fs,async f=>{await addCaissier(f);cl();go('cais');alert('Caissier enregistré.\nIdentifiant de connexion : '+f.nom.trim()+'\nMot de passe : celui que vous venez de saisir.')})}
-function doPrel(){if(!adminOnly())return;if(D.p.fin&&D.p.fin.slice(0,7)==T().slice(0,7)&&!confirm('Les mensualités de ce mois ont déjà été prélevées. Continuer ?'))return;if(confirm('Prélever les mensualités des prêts en cours ?'))alert(prelever(T())+' prêt(s) traité(s).')}
+function doPrel(){if(!adminOnly())return;const run=()=>alert(prelever(T())+' prêt(s) traité(s).'),q=()=>askC('Prélever les mensualités des prêts en cours ?',run);if(D.p.fin&&D.p.fin.slice(0,7)==T().slice(0,7))askC('Les mensualités de ce mois ont déjà été prélevées. Continuer ?',q);else q()}
 function doPen(){if(!adminOnly())return;alert(penal(T())+' pénalité(s) appliquée(s).')}
 async function addAgent(f){if(!A())E("Réservé à l'administrateur");if(!f.nom||!f.pre||!f.mdp)E('Nom, Prénom et Mot de passe obligatoires');if(FB&&f.mdp.trim().length<MINP)E('Mot de passe : '+MINP+' caractères minimum');const idn=f.nom.trim().toLowerCase();if(idn==D.auth.user||D.cais.some(x=>x.nom.trim().toLowerCase()==idn)||D.ag.some(x=>x.nom.trim().toLowerCase()==idn))E('Cet identifiant (nom) existe déjà');D.ag.push({id:nid(D.ag),nom:f.nom.trim(),pre:f.pre,tel:f.tel,st:f.st,h:await H(f.mdp)});if(FB&&f.st!='Inactif')await putWrap('ka',f.nom,f.mdp,KA);save()}
 function partager(){const u=location.href.split('#')[0].split('?')[0];
