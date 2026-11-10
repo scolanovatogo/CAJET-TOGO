@@ -449,7 +449,7 @@ const fpKey=()=>S?'cajet_fp_'+(TEN||'')+'_'+(S.role=='admin'?'adm':S.id):'',
  fb64=b=>btoa(String.fromCharCode(...new Uint8Array(b))),fub64=t=>Uint8Array.from(atob(t),c=>c.charCodeAt(0)),
  frnd=n=>crypto.getRandomValues(new Uint8Array(n));
 try{if(window.PublicKeyCredential&&window.isSecureContext&&PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable)PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable().then(v=>{FPSUP=!!v}).catch(()=>{})}catch(e){}
-function fpReset(){LOCKED=false;LOCKDAY='';FPASK=false;['lk','fpb'].forEach(i=>{const e=document.getElementById(i);if(e)e.remove()})}
+function fpReset(){LOCKED=false;LOCKDAY='';FPASK=false;['lk','fpb','fpc'].forEach(i=>{const e=document.getElementById(i);if(e)e.remove()})}
 function fpFull(msg){window._idleMsg=msg||"Déconnexion automatique. Saisissez de nouveau votre identifiant et votre mot de passe.";document.querySelectorAll('body > div').forEach(d=>{if(d.id!='m'&&d.style&&d.style.position=='fixed'&&d.style.zIndex=='99')d.remove()});CUR='home';cl();loginView()}
 function fpLock(){document.querySelectorAll('body > div').forEach(d=>{if(d.id!='m'&&d.style&&d.style.position=='fixed'&&d.style.zIndex=='99')d.remove()});cl();LOCKED=true;LOCKDAY=T();window._fpN=0;
  let o=document.getElementById('lk');if(o)o.remove();o=document.createElement('div');o.id='lk';o.style.cssText='position:fixed;inset:0;z-index:300;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:20px';
@@ -464,6 +464,12 @@ async function fpEnroll(){const b=document.getElementById('fpb');try{const lab=S
 function fpOffer(){if(!fpRole()||!FPSUP||FPASK||LOCKED||fpGet()||document.getElementById('fpb'))return;const m=document.getElementById('m');if(m&&m.className)return;
  const b=document.createElement('div');b.id='fpb';b.style.cssText='position:fixed;left:8px;right:8px;bottom:calc(64px + env(safe-area-inset-bottom));z-index:110;background:var(--c);border:1px solid var(--l);border-radius:12px;padding:10px;box-shadow:0 2px 10px rgba(0,0,0,.25);font-size:13px';
  b.innerHTML='👆 <b>Empreinte :</b> rouvrir rapidement après 5 min d\'inactivité, sans retaper le mot de passe.<div style="display:flex;gap:8px;margin-top:8px"><button type=button style="width:auto;padding:6px 12px" onclick="fpEnroll()">Activer</button><button type=button class=g style="width:auto;padding:6px 12px" onclick="FPASK=true;this.closest(\'#fpb\').remove()">Plus tard</button></div>';document.body.appendChild(b)}
+function fpWhy(){if(!window.PublicKeyCredential)return "Ce navigateur ne gère pas l'empreinte. Ouvrez l'application directement dans Chrome (et non depuis WhatsApp, Facebook ou un autre lien intégré).";if(!window.isSecureContext)return "La page doit être ouverte en https:// pour utiliser l'empreinte.";if(!FPSUP)return "Ce téléphone n'a pas d'empreinte prête : activez le verrouillage d'écran par empreinte dans les paramètres Android (Sécurité), puis rouvrez l'application dans Chrome.";return ''}
+function fpTap(){if(!fpRole())return;const w=fpWhy();if(w){alert(w);return}if(fpGet()){if(confirm("L'empreinte est activée sur ce téléphone. La désactiver ?")){try{localStorage.removeItem(fpKey())}catch(e){}toast('Empreinte désactivée');fpChip()}}else fpEnroll().then(fpChip)}
+function fpChip(){let c=document.getElementById('fpc');const show=fpRole()&&!LOCKED;if(!show){if(c)c.remove();return}
+ if(!c){c=document.createElement('button');c.id='fpc';c.type='button';c.onclick=fpTap;c.style.cssText='position:fixed;right:8px;bottom:calc(72px + env(safe-area-inset-bottom));z-index:105;width:auto;padding:6px 10px;border-radius:18px;font-size:12px;box-shadow:0 1px 6px rgba(0,0,0,.25)';document.body.appendChild(c)}
+ c.textContent=fpGet()?'👆 Empreinte activée':'👆 Activer l\'empreinte'}
+setInterval(fpChip,2000);
 setInterval(fpOffer,3000);
 addEventListener('pageshow',e=>{if(e.persisted&&!S)loginView()});
 loginView();
