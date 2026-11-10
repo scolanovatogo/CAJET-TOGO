@@ -401,7 +401,7 @@ window.agBil=per=>{const j=T(),lab={j:'Bilan du jour',s:'Bilan de la semaine',m:
  $('#af').onsubmit=async e=>{e.preventDefault();const f=Object.fromEntries(new FormData(e.target)),c=L.find(x=>key(x)==f.num);try{if(!c)E('Choisissez un client');if(!(+f.m>0))E('Montant invalide');if(+f.m<c.mise)E('Montant insuffisant : minimum '+fm(c.mise)+' FCFA');
   const R=await post(c.pend?{tc:c.tc,m:+f.m}:{num:c.num,m:+f.m});LG.push({cid:R.cid,k:'D',ts:Date.now(),d:R.d,h:R.h,nom:c.nom,num:c.num||'',m:+f.m});lgSave();
   mine.unshift({ts:Date.now(),k:R.k,off:R.off,lid:R.lid,txt:`✔ ${esx(c.nom)} (${c.num||'n° à venir'}) — ${fm(+f.m)} FCFA — ${new Date().toLocaleTimeString('fr-FR')}`});rM();netUi();e.target.m.value='';$('#er').textContent='';toast(post.off?'Pas de réseau : opération gardée sur le téléphone, envoi automatique au retour du réseau':'✔ Opération enregistrée avec succès')}catch(x){$('#er').textContent=x.message||'Dépôt NON envoyé : vérifiez la connexion Internet'}}}
-async function loginView(){S=null;KD=null;KA=null;ET=null;if(FB){D=emptyD();TEN=TEN0}shell();const cr=FB?(!TEN0&&window._cr):(!D.auth.user||!D.auth.admin);let nm='';
+async function loginView(){fpReset();S=null;KD=null;KA=null;ET=null;if(FB){D=emptyD();TEN=TEN0}shell();const cr=FB?(!TEN0&&window._cr):(!D.auth.user||!D.auth.admin);let nm='';
  if(FB&&TEN0){try{const L=await(await fg('licences/'+TEN0)).json();nm=L&&L.nom||'';try{localStorage.setItem('cajet_nm_'+TEN0,nm)}catch(e){}}catch(e){nm=localStorage.getItem('cajet_nm_'+TEN0)||''}}
  V(`<div class=card>${FB&&!TEN0?`<div style="display:flex;gap:8px;margin-bottom:12px"><button type=button class="${cr?'g':''}" style="flex:1" onclick="window._cr=0;loginView()">Se connecter</button><button type=button class="${cr?'':'g'}" style="flex:1" onclick="window._cr=1;loginView()">Créer mon compte administrateur</button></div>`:''}<h3>${cr?(FB?'Créer mon compte administrateur':'Première utilisation : compte administrateur'):'Connexion'+(R0=='c'?' — caissier':R0=='a'?' — agent de terrain':'')}</h3>${nm?'<p><b id=nm></b></p>':''}${cr?`<p style="color:var(--m);font-size:13px">Choisissez l'identifiant et le mot de passe de l'administrateur. Notez-les : ils sont demandés à chaque connexion. Vos caissiers et agents recevront un lien et leurs propres identifiants.</p>`:''}<form id=lf autocomplete=off>${cr&&FB?'<label>Nom de l\'établissement<input name=nom required></label>':''}<label>Identifiant<input name=u ${PWA} required></label><label>Mot de passe${cr?' ('+MINP+' caractères minimum, avec majuscules, minuscules et chiffres)':''}<input name=p type=${PWT} class=pw ${PWA} required></label>${cr?'<label>Confirmer le mot de passe<input name=p2 type=${PWT} class=pw ${PWA} required></label>':''}<label style="display:flex;gap:8px;align-items:center"><input type=checkbox style="width:auto;margin:0" onchange="pwShow(this.checked)"> Afficher le mot de passe</label><p class=er id=er></p><button>${cr?'Créer mon compte':'Se connecter'}</button></form>${FB&&!cr&&!R0?'<p style="font-size:13px"><a href="#" onclick="recoverView();return false">Mot de passe administrateur oublié ?</a></p>':''}${FB&&TEN0&&!R0?'<p style="font-size:13px"><a href="#" onclick="location.href=location.href.split(\'?\')[0].split(\'#\')[0];return false">Nouvel administrateur ? Créez votre propre compte</a></p>':''}</div>`);
  if(nm)$('#nm').textContent=nm;
@@ -432,10 +432,39 @@ function resetCais(){if(!adminOnly())return;if(!D.cais.length)return alert('Aucu
 const IDLE_MS=5*60*1000;let LASTACT=Date.now();
 const idleMark=()=>{LASTACT=Date.now()};
 ['pointerdown','pointermove','keydown','touchstart','touchmove','scroll','wheel','click','input'].forEach(ev=>addEventListener(ev,idleMark,{passive:true,capture:true}));
-function idleCheck(){if(!S)return;if(Date.now()-LASTACT<IDLE_MS)return;
+function idleCheck(){if(!S)return;if(LOCKED){if(T()!=LOCKDAY)fpFull("Nouvelle journée : saisissez votre identifiant et votre mot de passe.");return}if(Date.now()-LASTACT<IDLE_MS)return;
  document.querySelectorAll('body > div').forEach(d=>{if(d.id!='m'&&d.style&&d.style.position=='fixed'&&d.style.zIndex=='99')d.remove()});
+ if(fpOn()){fpLock();return}
  CUR='home';cl();window._idleMsg="Déconnexion automatique après 5 minutes d'inactivité. Saisissez de nouveau votre identifiant et votre mot de passe.";loginView()}
 setInterval(idleCheck,5000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)idleCheck()});addEventListener('pageshow',idleCheck);
+/* ===== EMPREINTE (administrateur et agents de terrain, téléphones compatibles) =====
+   Le mot de passe n'est JAMAIS enregistré. Après 5 min d'inactivité, l'écran est verrouillé : la session reste en mémoire
+   et seule l'empreinte du propriétaire du téléphone la rouvre, le même jour. Fermer l'application, redémarrer le téléphone
+   ou changer de jour = mot de passe obligatoire. Le caissier n'est pas concerné. */
+let LOCKED=false,LOCKDAY='',FPSUP=false,FPASK=false;
+const fpKey=()=>S?'cajet_fp_'+(TEN||'')+'_'+(S.role=='admin'?'adm':S.id):'',
+ fpGet=()=>{try{return localStorage.getItem(fpKey())||''}catch(e){return ''}},
+ fpRole=()=>!!S&&(S.role=='admin'||S.role=='agent'),
+ fpOn=()=>fpRole()&&FPSUP&&!!fpGet(),
+ fb64=b=>btoa(String.fromCharCode(...new Uint8Array(b))),fub64=t=>Uint8Array.from(atob(t),c=>c.charCodeAt(0)),
+ frnd=n=>crypto.getRandomValues(new Uint8Array(n));
+try{if(window.PublicKeyCredential&&window.isSecureContext&&PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable)PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable().then(v=>{FPSUP=!!v}).catch(()=>{})}catch(e){}
+function fpReset(){LOCKED=false;LOCKDAY='';FPASK=false;['lk','fpb'].forEach(i=>{const e=document.getElementById(i);if(e)e.remove()})}
+function fpFull(msg){window._idleMsg=msg||"Déconnexion automatique. Saisissez de nouveau votre identifiant et votre mot de passe.";document.querySelectorAll('body > div').forEach(d=>{if(d.id!='m'&&d.style&&d.style.position=='fixed'&&d.style.zIndex=='99')d.remove()});CUR='home';cl();loginView()}
+function fpLock(){document.querySelectorAll('body > div').forEach(d=>{if(d.id!='m'&&d.style&&d.style.position=='fixed'&&d.style.zIndex=='99')d.remove()});cl();LOCKED=true;LOCKDAY=T();window._fpN=0;
+ let o=document.getElementById('lk');if(o)o.remove();o=document.createElement('div');o.id='lk';o.style.cssText='position:fixed;inset:0;z-index:300;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:20px';
+ o.innerHTML='<div class=card style="max-width:360px;width:100%;text-align:center"><h3>🔒 Session verrouillée</h3><p style="color:var(--m)">Inactivité de 5 minutes. Posez votre doigt sur le capteur d\'empreinte pour reprendre.</p><button type=button onclick="fpUnlock()">👆 Déverrouiller avec l\'empreinte</button><p id=lke style="color:#b3261e;min-height:1.2em;margin:8px 0"></p><button type=button class=g onclick="fpFull()">Se déconnecter (mot de passe)</button></div>';document.body.appendChild(o)}
+async function fpUnlock(){const er=document.getElementById('lke');try{await navigator.credentials.get({publicKey:{challenge:frnd(32),allowCredentials:[{type:'public-key',id:fub64(fpGet()),transports:['internal']}],userVerification:'required',timeout:60000}});
+  LOCKED=false;LASTACT=Date.now();const o=document.getElementById('lk');if(o)o.remove()}
+ catch(e){window._fpN=(window._fpN||0)+1;if(window._fpN>=3){fpFull("Empreinte non reconnue : saisissez votre identifiant et votre mot de passe.");return}if(er)er.textContent='Empreinte non reconnue ou annulée. Réessayez ('+window._fpN+'/3).'}}
+async function fpEnroll(){const b=document.getElementById('fpb');try{const lab=S.role=='admin'?'Administrateur':S.nom;
+  const c=await navigator.credentials.create({publicKey:{challenge:frnd(32),rp:{name:'CAJET'},user:{id:frnd(16),name:lab,displayName:lab},pubKeyCredParams:[{type:'public-key',alg:-7},{type:'public-key',alg:-257}],authenticatorSelection:{authenticatorAttachment:'platform',userVerification:'required',residentKey:'discouraged'},timeout:60000,attestation:'none'}});
+  localStorage.setItem(fpKey(),fb64(c.rawId));if(b)b.remove();toast('✔ Empreinte activée sur ce téléphone')}
+ catch(e){FPASK=true;if(b)b.remove();toast("Empreinte non activée")}}
+function fpOffer(){if(!fpRole()||!FPSUP||FPASK||LOCKED||fpGet()||document.getElementById('fpb'))return;const m=document.getElementById('m');if(m&&m.className)return;
+ const b=document.createElement('div');b.id='fpb';b.style.cssText='position:fixed;left:8px;right:8px;bottom:calc(64px + env(safe-area-inset-bottom));z-index:110;background:var(--c);border:1px solid var(--l);border-radius:12px;padding:10px;box-shadow:0 2px 10px rgba(0,0,0,.25);font-size:13px';
+ b.innerHTML='👆 <b>Empreinte :</b> rouvrir rapidement après 5 min d\'inactivité, sans retaper le mot de passe.<div style="display:flex;gap:8px;margin-top:8px"><button type=button style="width:auto;padding:6px 12px" onclick="fpEnroll()">Activer</button><button type=button class=g style="width:auto;padding:6px 12px" onclick="FPASK=true;this.closest(\'#fpb\').remove()">Plus tard</button></div>';document.body.appendChild(b)}
+setInterval(fpOffer,3000);
 addEventListener('pageshow',e=>{if(e.persisted&&!S)loginView()});
 loginView();
 </script></body></html>
