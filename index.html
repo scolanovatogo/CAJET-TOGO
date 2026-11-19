@@ -21,6 +21,7 @@ button.g{background:var(--l);color:var(--t)}button.r{background:var(--r)}
 .grid button{padding:16px 8px}
 input,select{width:100%;padding:10px;margin:3px 0 10px;border:1px solid var(--l);border-radius:8px;background:var(--bg);color:var(--t);font-size:16px}
 label{font-size:13px;color:var(--m);display:block}
+.cbl{border:1px solid var(--l);border-radius:8px;max-height:35vh;overflow:auto;background:var(--bg);margin:-6px 0 10px}.cbo,.cbn{padding:10px;font-size:15px;color:var(--t);cursor:pointer}.cbn{color:var(--m);cursor:default}.cbo.a{background:var(--l)}
 .er{color:var(--r);min-height:18px;margin:0 0 8px}
 #m{display:none;position:fixed;inset:0;background:#0007;z-index:9;align-items:flex-end}
 #m.on{display:flex}.sheet{background:var(--c);width:100%;max-height:92vh;overflow:auto;padding:16px;border-radius:16px 16px 0 0;padding-bottom:max(16px,env(safe-area-inset-bottom))}
@@ -237,8 +238,21 @@ async function loginOff0(u,p){S=null;KD=null;KA=null;u=u.trim().toLowerCase();co
  await jrLoad()}
 /* ===== INTERFACE ===== */
 const V=h=>{$('#v').dataset.k='';$('#v').innerHTML=h},cl=()=>{$('#m').className=''},A=()=>S.role=='admin',opt=o=>Array.isArray(o)?o:[o,o];
-function form(title,fs,ok,btn='Enregistrer'){$('#m').innerHTML=`<div class=sheet><h3>${title}</h3><form id=f autocomplete=off>${fs.map(f=>`<label>${f.l}${f.t=='select'?`<select name=${f.n}>${f.o.map(o=>{o=opt(o);return`<option value="${o[0]}">${o[1]}</option>`}).join('')}</select>`:`<input name=${f.n} ${f.t=='password'?`type=${PWT} class=pw ${PWA}`:`type=${f.t||'text'}`} value="${f.v??''}" step=any ${f.r?'required':''}>`}</label>`).join('')}<p id=er class=er></p><button>${btn}</button> <button type=button class=g onclick=cl()>Annuler</button></form></div>`;
- $('#m').className='on';$('#f').onsubmit=async e=>{e.preventDefault();try{await ok(Object.fromEntries(new FormData(e.target)))}catch(x){$('#er').textContent=x.message}}}
+const nzc=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+function comboHtml(f){return `<div class=cbx><input class=cbi placeholder="Tapez un nom ou un numéro de compte" autocomplete=off><input type=hidden name=${f.n}><div class=cbl hidden></div></div>`}
+function comboInit(fs){const cs=fs.filter(f=>f.t=='combo');document.querySelectorAll('#f .cbx').forEach((bx,k)=>{const o=cs[k].o.map(opt),i=bx.children[0],h=bx.children[1],l=bx.children[2];let R=[],a=-1;
+const find=q=>o.filter(x=>!q||nzc(x[1]).includes(q)||nzc(x[0]).includes(q)),
+draw=()=>{R=find(h.value?'':nzc(i.value).trim()).slice(0,50);a=R.length?0:-1;l.innerHTML=R.length?R.map((x,j)=>`<div class="cbo${j==a?' a':''}" data-j="${j}">${esx(x[1])}</div>`).join(''):'<div class=cbn>Aucun client trouvé</div>';l.hidden=false},
+pick=x=>{h.value=x[0];i.value=x[1];l.hidden=true},
+mark=()=>{l.querySelectorAll('.cbo').forEach((e,j)=>e.classList.toggle('a',j==a));const e=l.querySelector('.cbo.a');e&&e.scrollIntoView({block:'nearest'})};
+i.onfocus=()=>{i.select();draw()};i.onclick=()=>{if(l.hidden)draw()};
+i.oninput=()=>{h.value='';draw()};
+i.onblur=()=>{l.hidden=true};
+l.onmousedown=e=>{e.preventDefault();const d=e.target.closest('.cbo');if(d)pick(R[+d.dataset.j])};
+i.onkeydown=e=>{if(e.key=='ArrowDown'){e.preventDefault();if(l.hidden)draw();else{a=Math.min(a+1,R.length-1);mark()}}else if(e.key=='ArrowUp'){e.preventDefault();a=Math.max(a-1,0);mark()}else if(e.key=='Enter'&&!l.hidden){e.preventDefault();if(R[a])pick(R[a])}else if(e.key=='Escape'&&!l.hidden){e.stopPropagation();l.hidden=true}};
+bx.chk=()=>{if(h.value)return;const m=i.value.trim()?find(nzc(i.value).trim()):[];if(m.length==1)return pick(m[0]);throw new Error('Choisissez un client dans la liste proposée')}})}
+function form(title,fs,ok,btn='Enregistrer'){$('#m').innerHTML=`<div class=sheet><h3>${title}</h3><form id=f autocomplete=off>${fs.map(f=>`<label>${f.l}${f.t=='combo'?comboHtml(f):f.t=='select'?`<select name=${f.n}>${f.o.map(o=>{o=opt(o);return`<option value="${o[0]}">${o[1]}</option>`}).join('')}</select>`:`<input name=${f.n} ${f.t=='password'?`type=${PWT} class=pw ${PWA}`:`type=${f.t||'text'}`} value="${f.v??''}" step=any ${f.r?'required':''}>`}</label>`).join('')}<p id=er class=er></p><button>${btn}</button> <button type=button class=g onclick=cl()>Annuler</button></form></div>`;
+ $('#m').className='on';comboInit(fs);$('#f').onsubmit=async e=>{e.preventDefault();try{document.querySelectorAll('#f .cbx').forEach(b=>b.chk());await ok(Object.fromEntries(new FormData(e.target)))}catch(x){$('#er').textContent=x.message}}}
 const comptesOpt=()=>D.comptes.map(c=>[c.num,c.num+' — '+c.nom]);
 /* Une opération est enregistrée sous « Nom Prénom » (caissier de la caisse) : on reconnaît le caissier connecté par son nom seul OU par nom + prénom */
 function isMine(t){if(!S)return false;const c=(t.caissier||'').trim().toLowerCase(),n=S.nom.trim().toLowerCase(),k=(D.cais||[]).find(x=>x.nom.trim().toLowerCase()==n);return c===n||(!!k&&c===(k.nom+' '+k.pre).trim().toLowerCase())}
@@ -280,7 +294,7 @@ function csv(k){const[t,rows,cols]=LS[k];dl(t+'.csv','\ufeff'+[cols.map(c=>c[0])
 const expo=()=>{try{localStorage.setItem('cajet_exp_'+TEN,Date.now())}catch(e){}dl('CAJET_sauvegarde_'+T()+'.json',JSON.stringify(D),'application/json')};
 function expRemind(){try{if(!A()||$('#m').className)return;const k='cajet_exp_'+TEN,sn='cajet_expsn_'+TEN,now=Date.now();if(now-(+localStorage.getItem(k)||0)<7*864e5||now-(+localStorage.getItem(sn)||0)<864e5)return;localStorage.setItem(sn,now);dlg("Rappel hebdomadaire : téléchargez une copie de sauvegarde de vos données sur ce téléphone et gardez le fichier. Elle vous protège même si le navigateur est vidé ou si internet est coupé.",[['Plus tard'],['Télécharger',()=>expo()]])}catch(e){}}
 function impo(i){const f=i.files[0];if(!f)return;f.text().then(x=>{try{const j=JSON.parse(x);if(!j.clients||!j.comptes)throw 0;askC('Remplacer toutes les données actuelles ?',()=>{D=j;save();go('home')})}catch(e){alert('Fichier invalide')}})}
-function opForm(){if(!A()&&!caisseDuCaissier()){alert('Aucune caisse ne vous est attribuée. Demandez à l’administrateur de vous ouvrir une caisse.');return}form('Opération',[{n:'num',l:'Compte',t:'select',o:comptesOpt()},{n:'type',l:'Type',t:'select',o:['Dépôt','Retrait']},{n:'m',l:'Montant (FCFA)',t:'number',r:1},{n:'d',l:'Date',t:'date',v:T(),r:1}],async f=>{const t=await CM('operation',[f.num,f.type,f.m,f.d],()=>operation(f.num,f.type,f.m,f.d));cl();shell();recu(t,1);toast(navigator.onLine?'✔ Opération enregistrée avec succès':'Pas de réseau : opération gardée sur le téléphone, envoi automatique au retour du réseau')},'Enregistrer')}
+function opForm(){if(!A()&&!caisseDuCaissier()){alert('Aucune caisse ne vous est attribuée. Demandez à l’administrateur de vous ouvrir une caisse.');return}form('Opération',[{n:'num',l:'Client (nom ou n° de compte)',t:'combo',o:comptesOpt()},{n:'type',l:'Type',t:'select',o:['Dépôt','Retrait']},{n:'m',l:'Montant (FCFA)',t:'number',r:1},{n:'d',l:'Date',t:'date',v:T(),r:1}],async f=>{const t=await CM('operation',[f.num,f.type,f.m,f.d],()=>operation(f.num,f.type,f.m,f.d));cl();shell();recu(t,1);toast(navigator.onLine?'✔ Opération enregistrée avec succès':'Pas de réseau : opération gardée sur le téléphone, envoi automatique au retour du réseau')},'Enregistrer')}
 const aPend=()=>{const o={};D.tx.filter(t=>t.qid&&!t.verse&&!t.an&&/^(Dépôt|Frais \(agent\))$/.test(t.type)).forEach(t=>{const a=t.caissier.replace(/^Agent /,'');(o[a]=o[a]||{n:0,m:0}).n++;o[a].m+=t.m});return o};
 function versement(a,m,qs){if(!A()&&!caisseDuCaissier())E('Aucune caisse ne vous est attribuée.');const k=D.caisses.find(x=>x.id==D.p.caisse)||E('Aucune caisse ouverte');m=+m;if(!(m>=0)||isNaN(m))E('Montant invalide');
  const L=D.tx.filter(t=>t.qid&&!t.verse&&!t.an&&/^(Dépôt|Frais \(agent\))$/.test(t.type)&&t.caissier=='Agent '+a&&(!qs||qs.includes(t.qid)));if(!L.length)E('Aucune collecte en attente pour cet agent');const tot=L.reduce((s,t)=>s+t.m,0);
